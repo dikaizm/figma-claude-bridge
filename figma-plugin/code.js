@@ -99,6 +99,15 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'clear-fills': {
+        var clearNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!clearNode || !('fills' in clearNode))
+          throw new Error('Node "' + msg.nodeId + '" not found or has no fills')
+        clearNode.fills = []
+        result = { nodeId: clearNode.id }
+        break
+      }
+
       case 'set-stroke': {
         var strokeNode = await figma.getNodeByIdAsync(msg.nodeId)
         if (!strokeNode || !('strokes' in strokeNode))
@@ -163,6 +172,17 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'insert-child': {
+        var insertParent = await figma.getNodeByIdAsync(msg.parentId)
+        if (!insertParent || !('insertChild' in insertParent))
+          throw new Error('Parent "' + msg.parentId + '" not found or does not support insertChild')
+        var insertNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!insertNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        insertParent.insertChild(msg.index, insertNode)
+        result = { nodeId: insertNode.id, index: msg.index }
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }
@@ -195,12 +215,35 @@ function serializeNode(node) {
   if ('width' in node) out.width = node.width
   if ('height' in node) out.height = node.height
   if ('opacity' in node) out.opacity = node.opacity
+  if ('fills' in node && node.fills && node.fills.length > 0) out.fills = node.fills
+  if ('strokes' in node && node.strokes && node.strokes.length > 0) out.strokes = node.strokes
   if (node.type === 'TEXT') {
     out.characters = node.characters
     out.fontSize = node.fontSize
   }
+  if ('layoutMode' in node) out.layoutMode = node.layoutMode
   if ('children' in node) {
     out.childCount = node.children.length
+  }
+  if ('reactions' in node && node.reactions && node.reactions.length > 0) {
+    out.reactions = node.reactions.map(function(r) {
+      var reaction = {}
+      if (r.trigger) reaction.trigger = r.trigger
+      if (r.action) {
+        reaction.action = {}
+        if (r.action.type) reaction.action.type = r.action.type
+        if (r.action.transition) {
+          var t = r.action.transition
+          reaction.action.transition = {
+            type: t.type,
+            duration: t.duration,
+            easing: t.easing
+          }
+        }
+        if (r.action.destinationId) reaction.action.destinationId = r.action.destinationId
+      }
+      return reaction
+    })
   }
   return out
 }
