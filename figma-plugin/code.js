@@ -183,6 +183,36 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'set-layout': {
+        var layoutNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!layoutNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        if (msg.layoutMode !== undefined) layoutNode.layoutMode = msg.layoutMode
+        if (msg.paddingLeft !== undefined) layoutNode.paddingLeft = msg.paddingLeft
+        if (msg.paddingRight !== undefined) layoutNode.paddingRight = msg.paddingRight
+        if (msg.paddingTop !== undefined) layoutNode.paddingTop = msg.paddingTop
+        if (msg.paddingBottom !== undefined) layoutNode.paddingBottom = msg.paddingBottom
+        if (msg.itemSpacing !== undefined) layoutNode.itemSpacing = msg.itemSpacing
+        if (msg.primaryAxisAlignItems !== undefined) layoutNode.primaryAxisAlignItems = msg.primaryAxisAlignItems
+        if (msg.counterAxisAlignItems !== undefined) layoutNode.counterAxisAlignItems = msg.counterAxisAlignItems
+        if (msg.layoutSizingHorizontal !== undefined) layoutNode.layoutSizingHorizontal = msg.layoutSizingHorizontal
+        if (msg.layoutSizingVertical !== undefined) layoutNode.layoutSizingVertical = msg.layoutSizingVertical
+        if (msg.layoutAlign !== undefined) layoutNode.layoutAlign = msg.layoutAlign
+        if (msg.layoutGrow !== undefined) layoutNode.layoutGrow = msg.layoutGrow
+        result = { nodeId: layoutNode.id }
+        break
+      }
+
+      case 'set-font': {
+        var fontNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!fontNode || fontNode.type !== 'TEXT') throw new Error('Text node "' + msg.nodeId + '" not found')
+        var fontName = { family: msg.family || 'Inter', style: msg.style || 'Regular' }
+        await figma.loadFontAsync(fontName)
+        fontNode.fontName = fontName
+        if (msg.fontSize !== undefined) fontNode.fontSize = msg.fontSize
+        result = { nodeId: fontNode.id }
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }
