@@ -213,6 +213,149 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'set-text-style': {
+        var tsNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!tsNode || tsNode.type !== 'TEXT') throw new Error('Text node "' + msg.nodeId + '" not found')
+        await figma.loadFontAsync(tsNode.fontName === figma.mixed ? { family: 'Inter', style: 'Regular' } : tsNode.fontName)
+        if (msg.textAlignHorizontal !== undefined) tsNode.textAlignHorizontal = msg.textAlignHorizontal
+        if (msg.textAlignVertical !== undefined) tsNode.textAlignVertical = msg.textAlignVertical
+        if (msg.textAutoResize !== undefined) tsNode.textAutoResize = msg.textAutoResize
+        if (msg.textCase !== undefined) tsNode.textCase = msg.textCase
+        if (msg.textDecoration !== undefined) tsNode.textDecoration = msg.textDecoration
+        if (msg.letterSpacing !== undefined) tsNode.letterSpacing = msg.letterSpacing
+        if (msg.lineHeight !== undefined) tsNode.lineHeight = msg.lineHeight
+        if (msg.paragraphSpacing !== undefined) tsNode.paragraphSpacing = msg.paragraphSpacing
+        result = { nodeId: tsNode.id }
+        break
+      }
+
+      case 'create-ellipse': {
+        var ellipse = figma.createEllipse()
+        ellipse.name = msg.name || 'Ellipse'
+        ellipse.x = msg.x || 0
+        ellipse.y = msg.y || 0
+        ellipse.resize(msg.width || 100, msg.height || 100)
+        await appendToParent(ellipse, msg.parentId)
+        result = serializeNode(ellipse)
+        break
+      }
+
+      case 'clone-node': {
+        var srcNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!srcNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        var cloned = srcNode.clone()
+        if (msg.x !== undefined) cloned.x = msg.x
+        if (msg.y !== undefined) cloned.y = msg.y
+        await appendToParent(cloned, msg.parentId)
+        result = serializeNode(cloned)
+        break
+      }
+
+      case 'set-corner-radius': {
+        var crNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!crNode || !('cornerRadius' in crNode)) throw new Error('Node "' + msg.nodeId + '" does not support corner radius')
+        if (msg.topLeft !== undefined || msg.topRight !== undefined || msg.bottomLeft !== undefined || msg.bottomRight !== undefined) {
+          crNode.topLeftRadius = msg.topLeft !== undefined ? msg.topLeft : 0
+          crNode.topRightRadius = msg.topRight !== undefined ? msg.topRight : 0
+          crNode.bottomLeftRadius = msg.bottomLeft !== undefined ? msg.bottomLeft : 0
+          crNode.bottomRightRadius = msg.bottomRight !== undefined ? msg.bottomRight : 0
+        } else {
+          crNode.cornerRadius = msg.radius
+        }
+        if (msg.cornerSmoothing !== undefined) crNode.cornerSmoothing = msg.cornerSmoothing
+        result = { nodeId: crNode.id }
+        break
+      }
+
+      case 'set-visible': {
+        var visNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!visNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        visNode.visible = msg.visible
+        result = { nodeId: visNode.id, visible: visNode.visible }
+        break
+      }
+
+      case 'set-blend-mode': {
+        var bmNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!bmNode || !('blendMode' in bmNode)) throw new Error('Node "' + msg.nodeId + '" does not support blend mode')
+        bmNode.blendMode = msg.blendMode
+        result = { nodeId: bmNode.id, blendMode: bmNode.blendMode }
+        break
+      }
+
+      case 'set-stroke-weight': {
+        var swNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!swNode || !('strokeWeight' in swNode)) throw new Error('Node "' + msg.nodeId + '" does not support stroke weight')
+        swNode.strokeWeight = msg.weight
+        if (msg.align !== undefined) swNode.strokeAlign = msg.align
+        result = { nodeId: swNode.id }
+        break
+      }
+
+      case 'set-effect': {
+        var effectNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!effectNode || !('effects' in effectNode)) throw new Error('Node "' + msg.nodeId + '" does not support effects')
+        var effects = Array.isArray(msg.effects) ? msg.effects : [msg.effect]
+        effectNode.effects = effects
+        result = { nodeId: effectNode.id }
+        break
+      }
+
+      case 'group-nodes': {
+        var groupNodes = []
+        for (var i = 0; i < msg.nodeIds.length; i++) {
+          var gn = await figma.getNodeByIdAsync(msg.nodeIds[i])
+          if (gn) groupNodes.push(gn)
+        }
+        if (groupNodes.length === 0) throw new Error('No valid nodes found to group')
+        var groupParent = groupNodes[0].parent
+        var group = figma.group(groupNodes, groupParent)
+        if (msg.name) group.name = msg.name
+        result = serializeNode(group)
+        break
+      }
+
+      case 'set-constraints': {
+        var conNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!conNode || !('constraints' in conNode)) throw new Error('Node "' + msg.nodeId + '" does not support constraints')
+        conNode.constraints = {
+          horizontal: msg.horizontal || 'LEFT',
+          vertical: msg.vertical || 'TOP'
+        }
+        result = { nodeId: conNode.id, constraints: conNode.constraints }
+        break
+      }
+
+      case 'set-rotation': {
+        var rotNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!rotNode || !('rotation' in rotNode)) throw new Error('Node "' + msg.nodeId + '" does not support rotation')
+        rotNode.rotation = msg.rotation
+        result = { nodeId: rotNode.id, rotation: rotNode.rotation }
+        break
+      }
+
+      case 'get-styles': {
+        var paintStyles = await figma.getLocalPaintStylesAsync()
+        var textStyles = await figma.getLocalTextStylesAsync()
+        var effectStyles = await figma.getLocalEffectStylesAsync()
+        result = {
+          paints: paintStyles.map(function(s) { return { id: s.id, name: s.name, key: s.key } }),
+          texts: textStyles.map(function(s) { return { id: s.id, name: s.name, key: s.key } }),
+          effects: effectStyles.map(function(s) { return { id: s.id, name: s.name, key: s.key } })
+        }
+        break
+      }
+
+      case 'export-node': {
+        var expNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!expNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        var expSettings = { format: msg.format || 'PNG' }
+        if (msg.scale) expSettings.constraint = { type: 'SCALE', value: msg.scale }
+        var bytes = await expNode.exportAsync(expSettings)
+        result = { nodeId: expNode.id, format: expSettings.format, data: figma.base64Encode(bytes) }
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }
@@ -245,13 +388,41 @@ function serializeNode(node) {
   if ('width' in node) out.width = node.width
   if ('height' in node) out.height = node.height
   if ('opacity' in node) out.opacity = node.opacity
+  if ('visible' in node) out.visible = node.visible
+  if ('locked' in node) out.locked = node.locked
   if ('fills' in node && node.fills && node.fills.length > 0) out.fills = node.fills
   if ('strokes' in node && node.strokes && node.strokes.length > 0) out.strokes = node.strokes
+  if ('strokeWeight' in node && node.strokeWeight !== figma.mixed) out.strokeWeight = node.strokeWeight
+  if ('strokeAlign' in node) out.strokeAlign = node.strokeAlign
+  if ('effects' in node && node.effects && node.effects.length > 0) out.effects = node.effects
+  if ('cornerRadius' in node && node.cornerRadius !== figma.mixed) out.cornerRadius = node.cornerRadius
+  if ('blendMode' in node) out.blendMode = node.blendMode
+  if ('rotation' in node && node.rotation !== 0) out.rotation = node.rotation
+  if ('constraints' in node) out.constraints = node.constraints
   if (node.type === 'TEXT') {
     out.characters = node.characters
-    out.fontSize = node.fontSize
+    out.fontSize = node.fontSize !== figma.mixed ? node.fontSize : 'mixed'
+    out.textAlignHorizontal = node.textAlignHorizontal
+    out.textAutoResize = node.textAutoResize
+    if (node.fontName !== figma.mixed) out.fontName = node.fontName
   }
-  if ('layoutMode' in node) out.layoutMode = node.layoutMode
+  if ('layoutMode' in node) {
+    out.layoutMode = node.layoutMode
+    if (node.layoutMode !== 'NONE') {
+      out.primaryAxisAlignItems = node.primaryAxisAlignItems
+      out.counterAxisAlignItems = node.counterAxisAlignItems
+      out.itemSpacing = node.itemSpacing
+      out.paddingTop = node.paddingTop
+      out.paddingBottom = node.paddingBottom
+      out.paddingLeft = node.paddingLeft
+      out.paddingRight = node.paddingRight
+      out.layoutSizingHorizontal = node.layoutSizingHorizontal
+      out.layoutSizingVertical = node.layoutSizingVertical
+    }
+  }
+  if ('layoutAlign' in node) out.layoutAlign = node.layoutAlign
+  if ('layoutGrow' in node) out.layoutGrow = node.layoutGrow
+  if ('layoutPositioning' in node) out.layoutPositioning = node.layoutPositioning
   if ('children' in node) {
     out.childCount = node.children.length
   }
