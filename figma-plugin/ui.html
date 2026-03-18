@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    font-size: 12px;
+    background: #1e1e1e;
+    color: #fff;
+    padding: 16px;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: #555;
+  }
+  .dot.connected { background: #4caf50; }
+  .dot.connecting { background: #ff9800; animation: pulse 1s infinite; }
+  .dot.error { background: #f44336; }
+  @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+  .label { color: #aaa; }
+  .status { font-weight: 600; }
+  .log {
+    font-size: 10px; color: #666;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .count { margin-left: auto; color: #555; font-size: 10px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="dot connecting" id="dot"></div>
+    <span class="label">Bridge</span>
+    <span class="status" id="status">Connecting...</span>
+    <span class="count" id="count"></span>
+  </div>
+  <div class="log" id="log">ws://localhost:3055</div>
+  <div class="log" id="cmdlog">Waiting for commands...</div>
+
+<script>
+  const WS_URL = 'ws://localhost:3055'
+  const dot = document.getElementById('dot')
+  const statusEl = document.getElementById('status')
+  const logEl = document.getElementById('log')
+  const cmdEl = document.getElementById('cmdlog')
+  const countEl = document.getElementById('count')
+
+  let ws
+  let retryTimer
+  let cmdCount = 0
+
+  function setStatus(state, text, detail) {
+    dot.className = 'dot ' + state
+    statusEl.textContent = text
+    if (detail) logEl.textContent = detail
+  }
+
+  function connect() {
+    setStatus('connecting', 'Connecting...', 'ws://localhost:3055')
+    ws = new WebSocket(WS_URL)
+
+    ws.onopen = () => {
+      clearTimeout(retryTimer)
+      setStatus('connected', 'Connected', 'ws://localhost:3055')
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data)
+        cmdCount++
+        countEl.textContent = cmdCount + ' cmds'
+        cmdEl.textContent = '← ' + msg.type
+        parent.postMessage({ pluginMessage: msg }, '*')
+      } catch (e) {
+        setStatus('error', 'Parse error', e.message)
+      }
+    }
+
+    ws.onclose = () => {
+      setStatus('connecting', 'Reconnecting...', 'Retrying in 2s...')
+      retryTimer = setTimeout(connect, 2000)
+    }
+
+    ws.onerror = () => {
+      setStatus('error', 'Connection failed', 'Is the bridge running?  npm start')
+      ws.close()
+    }
+  }
+
+  window.onmessage = (event) => {
+    const msg = event.data.pluginMessage
+    if (msg && msg.requestId && ws && ws.readyState === WebSocket.OPEN) {
+      const result = msg.error ? '✗ ' + msg.error : '✓ ok'
+      cmdEl.textContent = '→ ' + result
+      ws.send(JSON.stringify(msg))
+    }
+  }
+
+  connect()
+</script>
+</body>
+</html>

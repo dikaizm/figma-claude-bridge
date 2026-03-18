@@ -1,0 +1,13 @@
+{
+  "name": "Claude Code Bridge",
+  "id": "1145141919810893",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["ws://localhost:3055"],
+    "reasoning": "Connects to a local bridge server so Claude Code CLI can read and edit Figma designs"
+  }
+}
