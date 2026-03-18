@@ -334,6 +334,20 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'set-reaction': {
+        var reactNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!reactNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        if (!('reactions' in reactNode)) throw new Error('Node "' + msg.nodeId + '" does not support reactions')
+        var reactions = (msg.reactions || []).map(function(r) {
+          // Figma API uses `actions` (array) not `action` (single)
+          var actions = r.actions ? r.actions : (r.action ? [r.action] : [])
+          return { trigger: r.trigger, actions: actions }
+        })
+        await reactNode.setReactionsAsync(reactions)
+        result = { nodeId: reactNode.id, reactionCount: reactions.length, nodeName: reactNode.name }
+        break
+      }
+
       case 'get-styles': {
         var paintStyles = await figma.getLocalPaintStylesAsync()
         var textStyles = await figma.getLocalTextStylesAsync()
