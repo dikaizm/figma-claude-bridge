@@ -370,6 +370,124 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'create-table': {
+        var tblRows = msg.rows || 3
+        var tblCols = msg.columns || 3
+        var tblColWidths = msg.columnWidths || []
+        var tblColWidth = msg.columnWidth || 120
+        var tblRowH = msg.rowHeight || 40
+        var tblHeaderH = msg.headerHeight || tblRowH
+        var tblHeaders = msg.headers || []
+        var tblData = msg.data || []
+        var tblBorderColor = msg.borderColor || { r: 0.878, g: 0.878, b: 0.878 }
+        var tblHeaderFill = msg.headerFill || { r: 0.949, g: 0.949, b: 0.949 }
+        var tblCellFill = msg.cellFill || null
+        var tblFontSize = msg.fontSize || 13
+        var tblCellPadH = msg.cellPaddingHorizontal !== undefined ? msg.cellPaddingHorizontal : 12
+        var tblCellPadV = msg.cellPaddingVertical !== undefined ? msg.cellPaddingVertical : 0
+        var tblFontFamily = msg.fontFamily || 'Inter'
+
+        await figma.loadFontAsync({ family: tblFontFamily, style: 'Regular' })
+        await figma.loadFontAsync({ family: tblFontFamily, style: 'Bold' })
+
+        var tblFrame = figma.createFrame()
+        tblFrame.name = msg.name || 'Table'
+        tblFrame.x = msg.x || 0
+        tblFrame.y = msg.y || 0
+        tblFrame.layoutMode = 'VERTICAL'
+        tblFrame.itemSpacing = 0
+        tblFrame.paddingTop = 0
+        tblFrame.paddingBottom = 0
+        tblFrame.paddingLeft = 0
+        tblFrame.paddingRight = 0
+        tblFrame.primaryAxisAlignItems = 'MIN'
+        tblFrame.counterAxisAlignItems = 'MIN'
+        tblFrame.layoutSizingHorizontal = 'HUG'
+        tblFrame.layoutSizingVertical = 'HUG'
+        tblFrame.clipsContent = true
+        tblFrame.fills = []
+        tblFrame.strokes = [{ type: 'SOLID', color: { r: tblBorderColor.r, g: tblBorderColor.g, b: tblBorderColor.b }, opacity: tblBorderColor.a !== undefined ? tblBorderColor.a : 1 }]
+        tblFrame.strokeWeight = 1
+        tblFrame.strokeAlign = 'OUTSIDE'
+
+        var makeTblRow = function(rowName) {
+          var row = figma.createFrame()
+          row.name = rowName
+          row.layoutMode = 'HORIZONTAL'
+          row.itemSpacing = 0
+          row.paddingTop = 0
+          row.paddingBottom = 0
+          row.paddingLeft = 0
+          row.paddingRight = 0
+          row.primaryAxisAlignItems = 'MIN'
+          row.counterAxisAlignItems = 'MIN'
+          row.layoutSizingHorizontal = 'HUG'
+          row.layoutSizingVertical = 'HUG'
+          row.fills = []
+          return row
+        }
+
+        var makeTblCell = function(text, isHeader, width, height) {
+          var cell = figma.createFrame()
+          cell.resize(width, height)
+          cell.layoutMode = 'HORIZONTAL'
+          cell.paddingLeft = tblCellPadH
+          cell.paddingRight = tblCellPadH
+          cell.paddingTop = tblCellPadV
+          cell.paddingBottom = tblCellPadV
+          cell.primaryAxisAlignItems = 'MIN'
+          cell.counterAxisAlignItems = 'CENTER'
+          cell.layoutSizingHorizontal = 'FIXED'
+          cell.layoutSizingVertical = 'FIXED'
+          if (isHeader) {
+            cell.fills = [{ type: 'SOLID', color: { r: tblHeaderFill.r, g: tblHeaderFill.g, b: tblHeaderFill.b }, opacity: tblHeaderFill.a !== undefined ? tblHeaderFill.a : 1 }]
+          } else if (tblCellFill) {
+            cell.fills = [{ type: 'SOLID', color: { r: tblCellFill.r, g: tblCellFill.g, b: tblCellFill.b }, opacity: tblCellFill.a !== undefined ? tblCellFill.a : 1 }]
+          } else {
+            cell.fills = []
+          }
+          cell.strokes = [{ type: 'SOLID', color: { r: tblBorderColor.r, g: tblBorderColor.g, b: tblBorderColor.b }, opacity: tblBorderColor.a !== undefined ? tblBorderColor.a : 1 }]
+          cell.strokeWeight = 1
+          cell.strokeAlign = 'INSIDE'
+          var tnode = figma.createText()
+          tnode.fontName = { family: tblFontFamily, style: isHeader ? 'Bold' : 'Regular' }
+          tnode.characters = text !== undefined && text !== null ? String(text) : ''
+          tnode.fontSize = tblFontSize
+          tnode.textAutoResize = 'HEIGHT'
+          tnode.layoutGrow = 1
+          tnode.layoutAlign = 'STRETCH'
+          cell.appendChild(tnode)
+          return cell
+        }
+
+        if (tblHeaders.length > 0) {
+          var hRow = makeTblRow('Header')
+          for (var hi = 0; hi < tblCols; hi++) {
+            var hw = tblColWidths[hi] !== undefined ? tblColWidths[hi] : tblColWidth
+            var hCell = makeTblCell(tblHeaders[hi] !== undefined ? tblHeaders[hi] : ('Column ' + (hi + 1)), true, hw, tblHeaderH)
+            hCell.name = 'Header ' + (hi + 1)
+            hRow.appendChild(hCell)
+          }
+          tblFrame.appendChild(hRow)
+        }
+
+        for (var ri = 0; ri < tblRows; ri++) {
+          var dRow = makeTblRow('Row ' + (ri + 1))
+          for (var ci = 0; ci < tblCols; ci++) {
+            var cw = tblColWidths[ci] !== undefined ? tblColWidths[ci] : tblColWidth
+            var cellVal = tblData[ri] && tblData[ri][ci] !== undefined ? tblData[ri][ci] : ''
+            var dCell = makeTblCell(cellVal, false, cw, tblRowH)
+            dCell.name = 'Cell ' + (ri + 1) + '-' + (ci + 1)
+            dRow.appendChild(dCell)
+          }
+          tblFrame.appendChild(dRow)
+        }
+
+        await appendToParent(tblFrame, msg.parentId)
+        result = serializeNode(tblFrame)
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }

@@ -108,6 +108,63 @@ TEXT only:
 
 `action.transition` is `null` for instant transitions — always check it exists before reading fields.
 
+#### Setting reactions (`set-reaction`)
+
+Use the `actions` array format (not `action` singular). The `navigation` field is required:
+
+```bash
+# Frame-to-frame navigation (between top-level frames)
+curl -s -X POST http://localhost:3056/command \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "set-reaction",
+    "nodeId": "<id>",
+    "reactions": [{
+      "trigger": {"type": "ON_CLICK"},
+      "actions": [{
+        "type": "NODE",
+        "navigation": "NAVIGATE",
+        "destinationId": "<target-frame-id>",
+        "transition": {
+          "type": "SMART_ANIMATE",
+          "duration": 0.3,
+          "easing": {"type": "EASE_OUT"}
+        },
+        "resetScrollPosition": false
+      }]
+    }]
+  }'
+
+# Variant-to-variant (inside a COMPONENT_SET) — must use CHANGE_TO
+curl -s -X POST http://localhost:3056/command \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "set-reaction",
+    "nodeId": "<variant-id>",
+    "reactions": [{
+      "trigger": {"type": "AFTER_TIMEOUT", "timeout": 0.001},
+      "actions": [{
+        "type": "NODE",
+        "navigation": "CHANGE_TO",
+        "destinationId": "<next-variant-id>",
+        "transition": {
+          "type": "SMART_ANIMATE",
+          "duration": 0.087,
+          "easing": {"type": "LINEAR"}
+        },
+        "resetScrollPosition": false
+      }]
+    }]
+  }'
+```
+
+**`navigation` values:**
+- `NAVIGATE` — go to another top-level frame
+- `CHANGE_TO` — swap to another variant **within the same COMPONENT_SET** (always use this for variant interactions)
+- `SWAP` — swap an instance with another component
+- `OVERLAY` — open as overlay
+- `SCROLL_TO` — scroll to a node
+
 ---
 
 ### Text
@@ -156,6 +213,76 @@ curl -s -X POST http://localhost:3056/command \
 **`textDecoration`:** `NONE` | `UNDERLINE` | `STRIKETHROUGH`
 
 **`letterSpacing` / `lineHeight`:** `{ value: number, unit: "PIXELS" | "PERCENT" }` or `{ unit: "AUTO" }` for lineHeight
+
+---
+
+### Table
+
+Create a complete table in **one command** — includes header row, data rows, cells with text, borders, and auto layout. Never build tables cell-by-cell.
+
+```bash
+# Minimal: 3 rows × 3 columns, default sizing
+curl -s -X POST http://localhost:3056/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"create-table","rows":3,"columns":3}'
+
+# Full example with headers and data
+curl -s -X POST http://localhost:3056/command \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "create-table",
+    "name": "Pricing Table",
+    "x": 100, "y": 100,
+    "parentId": "<id>",
+    "rows": 4,
+    "columns": 3,
+    "columnWidth": 160,
+    "rowHeight": 44,
+    "headers": ["Feature", "Starter", "Pro"],
+    "data": [
+      ["Storage", "5 GB", "100 GB"],
+      ["Users", "1", "10"],
+      ["Support", "Email", "Priority"],
+      ["Price", "$0/mo", "$29/mo"]
+    ],
+    "fontSize": 13,
+    "fontFamily": "Inter",
+    "headerFill": {"r":0.949,"g":0.949,"b":0.949},
+    "borderColor": {"r":0.878,"g":0.878,"b":0.878},
+    "cellPaddingHorizontal": 12,
+    "cellPaddingVertical": 0
+  }'
+
+# Per-column widths (overrides columnWidth)
+curl -s -X POST http://localhost:3056/command \
+  -H "Content-Type: application/json" \
+  -d '{"type":"create-table","rows":3,"columns":3,"columnWidths":[200,120,120],"headers":["Name","Status","Date"]}'
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `rows` | number | 3 | Number of data rows (excluding header) |
+| `columns` | number | 3 | Number of columns |
+| `columnWidth` | number | 120 | Uniform column width (px) |
+| `columnWidths` | number[] | — | Per-column widths; overrides `columnWidth` |
+| `rowHeight` | number | 40 | Height of each data row (px) |
+| `headerHeight` | number | rowHeight | Height of header row (px) |
+| `headers` | string[] | — | Header labels; omit for no header row |
+| `data` | string[][] | — | 2D array of cell values `[row][col]` |
+| `fontSize` | number | 13 | Font size for all cells |
+| `fontFamily` | string | `"Inter"` | Font family |
+| `headerFill` | color | `{r:0.949,…}` | Header background (0–1 floats) |
+| `cellFill` | color | transparent | Data cell background |
+| `borderColor` | color | `{r:0.878,…}` | Border/stroke color |
+| `cellPaddingHorizontal` | number | 12 | Left/right padding inside each cell |
+| `cellPaddingVertical` | number | 0 | Top/bottom padding inside each cell |
+| `x`, `y` | number | 0 | Table position |
+| `parentId` | string | — | Parent node ID |
+| `name` | string | `"Table"` | Table frame name |
+
+Returns the serialized table frame node. Header cells use **Bold**, data cells use Regular.
 
 ---
 
