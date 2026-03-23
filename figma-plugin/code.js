@@ -488,6 +488,106 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'create-stagger-set': {
+        var ssNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!ssNode) throw new Error('Node "' + msg.nodeId + '" not found')
+        var ssGroups = msg.staggerGroups || []
+        var ssDelay = (msg.delay !== undefined ? msg.delay : 150) / 1000
+        var ssDuration = msg.duration !== undefined ? msg.duration : 0.3
+        var ssNumVariants = ssGroups.length + 1
+
+        function getNodeAtPath(root, path) {
+          var cur = root
+          for (var pi = 0; pi < path.length; pi++) {
+            if (!cur.children || path[pi] >= cur.children.length) return null
+            cur = cur.children[path[pi]]
+          }
+          return cur
+        }
+
+        var allPaths = []
+        for (var sgi = 0; sgi < ssGroups.length; sgi++) {
+          for (var sgni = 0; sgni < ssGroups[sgi].length; sgni++) {
+            allPaths.push(ssGroups[sgi][sgni])
+          }
+        }
+
+        var ssComponents = []
+
+        for (var svi = 0; svi < ssNumVariants; svi++) {
+          var ssClone = ssNode.clone()
+          ssClone.name = 'State=' + (svi + 1)
+          figma.currentPage.appendChild(ssClone)
+
+          for (var sai = 0; sai < allPaths.length; sai++) {
+            var tn = getNodeAtPath(ssClone, allPaths[sai])
+            if (tn && 'opacity' in tn) tn.opacity = 0
+          }
+
+          for (var sri = 0; sri < svi; sri++) {
+            for (var srni = 0; srni < ssGroups[sri].length; srni++) {
+              var rn = getNodeAtPath(ssClone, ssGroups[sri][srni])
+              if (rn && 'opacity' in rn) rn.opacity = 1
+            }
+          }
+
+          var ssComp = figma.createComponent()
+          ssComp.name = ssClone.name
+          ssComp.resize(ssClone.width, ssClone.height)
+          ssComp.fills = ssClone.fills
+          if (ssClone.layoutMode !== undefined && ssClone.layoutMode !== 'NONE') {
+            ssComp.layoutMode = ssClone.layoutMode
+            ssComp.primaryAxisAlignItems = ssClone.primaryAxisAlignItems
+            ssComp.counterAxisAlignItems = ssClone.counterAxisAlignItems
+            ssComp.itemSpacing = ssClone.itemSpacing
+            ssComp.paddingTop = ssClone.paddingTop
+            ssComp.paddingBottom = ssClone.paddingBottom
+            ssComp.paddingLeft = ssClone.paddingLeft
+            ssComp.paddingRight = ssClone.paddingRight
+          }
+          var ssCloneKids = []
+          for (var scci = 0; scci < ssClone.children.length; scci++) {
+            ssCloneKids.push(ssClone.children[scci])
+          }
+          for (var smci = 0; smci < ssCloneKids.length; smci++) {
+            ssComp.appendChild(ssCloneKids[smci])
+          }
+          ssClone.remove()
+          figma.currentPage.appendChild(ssComp)
+          ssComponents.push(ssComp)
+        }
+
+        var ssSet = figma.combineAsVariants(ssComponents, figma.currentPage)
+        if (msg.name) ssSet.name = msg.name
+        if (msg.x !== undefined) ssSet.x = msg.x
+        if (msg.y !== undefined) ssSet.y = msg.y
+
+        for (var sreaci = 0; sreaci < ssComponents.length - 1; sreaci++) {
+          var sfrom = ssComponents[sreaci]
+          var sto = ssComponents[sreaci + 1]
+          await sfrom.setReactionsAsync([{
+            trigger: { type: 'AFTER_TIMEOUT', timeout: ssDelay },
+            actions: [{
+              type: 'NODE',
+              destinationId: sto.id,
+              navigation: 'CHANGE_TO',
+              transition: {
+                type: 'SMART_ANIMATE',
+                duration: ssDuration,
+                easing: { type: 'EASE_OUT' }
+              },
+              preserveScrollPosition: false,
+              resetVideoPosition: false,
+              resetScrollPosition: false,
+              resetInteractiveComponents: false
+            }]
+          }])
+        }
+
+        result = serializeNode(ssSet)
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }
