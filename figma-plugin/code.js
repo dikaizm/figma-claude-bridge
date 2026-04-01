@@ -213,6 +213,16 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'apply-text-style-id': {
+        var stNode = await figma.getNodeByIdAsync(msg.nodeId)
+        if (!stNode || stNode.type !== 'TEXT') throw new Error('Text node "' + msg.nodeId + '" not found')
+        await figma.loadFontAsync(stNode.fontName === figma.mixed ? { family: 'Inter', style: 'Regular' } : stNode.fontName)
+        await stNode.setTextStyleIdAsync(msg.styleId)
+        var appliedStyle = figma.getStyleById(msg.styleId)
+        result = { nodeId: stNode.id, styleId: msg.styleId, styleName: appliedStyle ? appliedStyle.name : null }
+        break
+      }
+
       case 'set-text-style': {
         var tsNode = await figma.getNodeByIdAsync(msg.nodeId)
         if (!tsNode || tsNode.type !== 'TEXT') throw new Error('Text node "' + msg.nodeId + '" not found')
@@ -637,6 +647,11 @@ function serializeNode(node) {
     out.textAlignHorizontal = node.textAlignHorizontal
     out.textAutoResize = node.textAutoResize
     if (node.fontName !== figma.mixed) out.fontName = node.fontName
+    if (node.textStyleId && node.textStyleId !== figma.mixed) {
+      out.textStyleId = node.textStyleId
+      var tsStyle = figma.getStyleById(node.textStyleId)
+      if (tsStyle) out.textStyleName = tsStyle.name
+    }
   }
   if ('layoutMode' in node) {
     out.layoutMode = node.layoutMode
