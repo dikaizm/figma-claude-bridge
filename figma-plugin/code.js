@@ -598,6 +598,30 @@ figma.ui.onmessage = async function(msg) {
         break
       }
 
+      case 'get-variables': {
+        var varCollections = await figma.variables.getLocalVariableCollectionsAsync()
+        var allVars = await figma.variables.getLocalVariablesAsync()
+        result = {
+          collections: varCollections.map(function(c) {
+            return {
+              id: c.id,
+              name: c.name,
+              modes: c.modes.map(function(m) { return { modeId: m.modeId, name: m.name } }),
+              variableIds: c.variableIds
+            }
+          }),
+          variables: allVars.map(function(v) {
+            return {
+              id: v.id,
+              name: v.name,
+              resolvedType: v.resolvedType,
+              valuesByMode: v.valuesByMode
+            }
+          })
+        }
+        break
+      }
+
       default:
         throw new Error('Unknown command type: "' + type + '"')
     }
